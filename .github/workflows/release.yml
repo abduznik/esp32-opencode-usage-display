@@ -14,6 +14,9 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        variant: [portrait, landscape]
     steps:
       - uses: actions/checkout@v4
 
@@ -24,21 +27,22 @@ jobs:
       - name: Install PlatformIO
         run: pip install -U platformio
 
-      - name: Build firmware
-        run: pio run -e esp32dev
+      - name: Build firmware (${{ matrix.variant }})
+        run: pio run -e esp32dev_${{ matrix.variant }}
 
       - name: Locate build artifacts
         run: |
           mkdir -p out
-          cp .pio/build/esp32dev/firmware.bin out/firmware.bin
-          cp .pio/build/esp32dev/firmware.elf out/firmware.elf || true
-          cp .pio/build/esp32dev/bootloader.bin out/bootloader.bin || true
-          cp .pio/build/esp32dev/partitions.bin out/partitions.bin || true
+          SRC=.pio/build/esp32dev_${{ matrix.variant }}
+          cp $SRC/firmware.bin out/firmware-${{ matrix.variant }}.bin
+          cp $SRC/firmware.elf out/firmware-${{ matrix.variant }}.elf || true
+          cp $SRC/bootloader.bin out/bootloader-${{ matrix.variant }}.bin || true
+          cp $SRC/partitions.bin out/partitions-${{ matrix.variant }}.bin || true
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: firmware
+          name: firmware-${{ matrix.variant }}
           path: out/
 
       - name: Create GitHub Release

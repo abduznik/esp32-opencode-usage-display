@@ -195,7 +195,7 @@ void drawRow(int y, const char* label, const Quota &q) {
 
   int barX = 10;
   int barY = y + 16;
-  int barW = 220;
+  int barW = tft.width() - 20;
   int barH = 16;
 
   uint16_t color = q.ok ? colorForPercent(q.percent) : TFT_DARKGREY;
@@ -230,11 +230,15 @@ void drawScreen(const UsageData &data, bool wifiOk) {
     tft.drawString("WiFi disconnected", tft.width() / 2, 30, 2);
   }
 
-  int y = 50;
+  int top = 40;
+  int bottom = data.valid ? tft.height() : tft.height() - 20;
+  int rowSpacing = (bottom - top) / 3;
+
+  int y = top;
   drawRow(y, "Rolling (5hr)", data.rolling);
-  y += 68;
+  y += rowSpacing;
   drawRow(y, "Weekly", data.weekly);
-  y += 68;
+  y += rowSpacing;
   drawRow(y, "Monthly", data.monthly);
 
   if (!data.valid) {
@@ -251,7 +255,10 @@ void setup() {
   pinMode(PROVISION_BUTTON_PIN, INPUT_PULLUP);
 
   tft.init();
-  tft.setRotation(0);
+#ifndef DISPLAY_ROTATION
+#define DISPLAY_ROTATION 0
+#endif
+  tft.setRotation(DISPLAY_ROTATION);
   tft.fillScreen(TFT_BLACK);
 
   bool forcePortal = (digitalRead(PROVISION_BUTTON_PIN) == LOW);
