@@ -81,7 +81,7 @@ void runProvisioning(bool forcePortal) {
   wm.setSaveParamsCallback(saveApiTokenCallback);
   wm.setConfigPortalTimeout(180);
 
-  drawMessage("Setup mode", "Join WiFi: OpenCode-Display");
+  drawMessage("Join WiFi: OpenCode-Display", "Then open 192.168.4.1");
 
   bool connected;
   if (forcePortal) {
@@ -157,11 +157,13 @@ bool fetchUsage(UsageData &out) {
   return out.valid;
 }
 
+// Darker fill colors keep white overlay text and dark row backgrounds
+// readable — the old bright TFT_GREEN/TFT_YELLOW washed out foreground text.
 uint16_t colorForPercent(int pct) {
   if (pct < 0) return TFT_DARKGREY;
-  if (pct < 50) return TFT_GREEN;
-  if (pct < 80) return TFT_YELLOW;
-  return TFT_RED;
+  if (pct < 50) return 0x0500;  // dark green
+  if (pct < 80) return 0x6B00;  // dark amber
+  return 0x8000;                // dark red
 }
 
 void drawBar(int x, int y, int w, int h, int pct, uint16_t color) {
@@ -180,9 +182,9 @@ void drawRow(int y, const char* label, const Quota &q) {
   tft.drawString(label, 10, y, 2);
 
   int barX = 10;
-  int barY = y + 18;
+  int barY = y + 16;
   int barW = 220;
-  int barH = 20;
+  int barH = 16;
 
   uint16_t color = q.ok ? colorForPercent(q.percent) : TFT_DARKGREY;
   drawBar(barX, barY, barW, barH, q.ok ? q.percent : 0, color);
@@ -193,9 +195,14 @@ void drawRow(int y, const char* label, const Quota &q) {
   } else {
     snprintf(pctStr, sizeof(pctStr), "--");
   }
-  tft.setTextColor(TFT_WHITE, color);
-  tft.setTextDatum(MR_DATUM);
-  tft.drawString(pctStr, barX + barW - 6, barY + barH / 2, 2);
+
+  // Large bold percentage, drawn below the bar (not overlaid) so it never
+  // gets washed out against the fill color.
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  tft.setTextDatum(TR_DATUM);
+  tft.setTextFont(4);
+  tft.drawString(pctStr, barX + barW, barY + barH + 6, 4);
+  tft.setTextFont(1);
 }
 
 void drawScreen(const UsageData &data, bool wifiOk) {
@@ -213,9 +220,9 @@ void drawScreen(const UsageData &data, bool wifiOk) {
 
   int y = 50;
   drawRow(y, "Rolling (5hr)", data.rolling);
-  y += 50;
+  y += 68;
   drawRow(y, "Weekly", data.weekly);
-  y += 50;
+  y += 68;
   drawRow(y, "Monthly", data.monthly);
 
   if (!data.valid) {
