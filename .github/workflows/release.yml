@@ -1,0 +1,46 @@
+name: Build and Release Firmware
+
+on:
+  push:
+    tags:
+      - "v*"
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install PlatformIO
+        run: pip install -U platformio
+
+      - name: Build firmware
+        run: pio run -e esp32dev
+
+      - name: Locate build artifacts
+        run: |
+          mkdir -p out
+          cp .pio/build/esp32dev/firmware.bin out/firmware.bin
+          cp .pio/build/esp32dev/firmware.elf out/firmware.elf || true
+          cp .pio/build/esp32dev/bootloader.bin out/bootloader.bin || true
+          cp .pio/build/esp32dev/partitions.bin out/partitions.bin || true
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware
+          path: out/
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/*
+          generate_release_notes: true
