@@ -49,6 +49,7 @@ struct Provider {
 
   UsageData lastGood;
   unsigned long lastPollAt = 0;
+  unsigned long lastSuccessAt = 0;
   bool everPolled = false;
 };
 
@@ -179,6 +180,7 @@ bool fetchOpencodeUsage(const String &apiKey, UsageData &out) {
 
   https.addHeader("Authorization", String("Bearer ") + apiKey);
   https.addHeader("Accept", "application/json");
+  https.addHeader("User-Agent", "opencode/1.0");
   https.setTimeout(10000);
 
   int httpCode = https.GET();
@@ -321,6 +323,31 @@ void drawProviderScreen(const Provider &p, bool wifiOk) {
   tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
   tft.setTextDatum(BL_DATUM);
   tft.drawString(WiFi.localIP().toString(), 4, tft.height() - 2, 1);
+}
+
+// Redraws just the "Xs ago" text in the bottom-right corner, without a full
+// screen clear — cheap enough to call every second so the display visibly
+// ticks between polls instead of looking frozen.
+void drawFreshnessFooter(const Provider &p) {
+  char buf[24];
+  if (!p.everPolled) {
+    snprintf(buf, sizeof(buf), "waiting...");
+  } else {
+    unsigned long agoMs = millis() - p.lastSuccessAt;
+    unsigned long agoS = agoMs / 1000UL;
+    if (agoS < 60) {
+      snprintf(buf, sizeof(buf), "updated %lus ago", agoS);
+    } else {
+      snprintf(buf, sizeof(buf), "updated %lum ago", agoS / 60UL);
+    }
+  }
+
+  int w = tft.width();
+  int h = tft.height();
+  tft.fillRect(w - 130, h - 12, 130, 12, TFT_BLACK);
+  tft.setTextColor(TFT_DARKGREY, TFT_BLACK);
+  tft.setTextDatum(BR_DATUM);
+  tft.drawString(buf, w - 4, h - 2, 1);
 }
 
 std::vector<Provider*> enabledProviders() {
@@ -661,6 +688,7 @@ void loop() {
         Serial.printf("[%s] rolling=%d%% weekly=%d%% monthly=%d%%\n",
                       p.name.c_str(), p.lastGood.rolling.percent,
                       p.lastGood.weekly.percent, p.lastGood.monthly.percent);
+        p.lastSuccessAt = now;
       } else {
         Serial.printf("[%s] usage fetch failed\n", p.name.c_str());
       }
@@ -674,15 +702,30 @@ void loop() {
   }
 
   // Advance the slideshow, or just refresh the current slide if its data changed.
+  bool fullRedraw = false;
   if (!shown.empty() && now - lastSlideAt >= slideSeconds * 1000UL) {
     slideIndex = (slideIndex + 1) % shown.size();
     lastSlideAt = now;
     renderCurrentSlide(true);
+    fullRedraw = true;
   } else if (shown.empty()) {
     renderCurrentSlide(true);
+    fullRedraw = true;
   } else if (currentSlideUpdated) {
     renderCurrentSlide(true);
+    fullRedraw = true;
   }
+
+  // Cheap once-a-second tick so the screen visibly shows it's alive between
+  // full redraws, instead of looking frozen for up to POLL_INTERVAL_MS.
+  static unsigned long lastFooterAt = 0;
+  if (!fullRedraw && !shown.empty() && now - lastFooterAt >= 1000) {
+    lastFooterAt = now;
+    if (slideIndex < shown.size()) {
+      drawFreshnessFooter(*shown[slideIndex]);
+    }
+  }
+  if (fullRedraw) lastFooterAt = now;
 
   delay(200);
 }
