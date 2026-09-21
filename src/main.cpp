@@ -81,7 +81,19 @@ void runProvisioning(bool forcePortal) {
   wm.setSaveParamsCallback(saveApiTokenCallback);
   wm.setConfigPortalTimeout(180);
 
-  drawMessage("Join WiFi: OpenCode-Display", "Then open 192.168.4.1");
+  // Only shown once WiFiManager actually gives up on saved credentials and
+  // opens the setup AP — not while it's still trying to reconnect, which
+  // can take 10-15s on its own and previously looked identical to "needs
+  // setup" even though it wasn't.
+  wm.setAPCallback([](WiFiManager*) {
+    drawMessage("Join WiFi: OpenCode-Display", "Then open 192.168.4.1");
+  });
+
+  if (forcePortal) {
+    drawMessage("Join WiFi: OpenCode-Display", "Then open 192.168.4.1");
+  } else {
+    drawMessage("Connecting to WiFi...", "Please wait");
+  }
 
   bool connected;
   if (forcePortal) {
